@@ -152,6 +152,11 @@ Trate como duas afirmações separadas, cada uma com seu próprio tier:
 "Achei a causa" (mesmo que CONFIRMED) não implica automaticamente "minha primeira correção
 está certa" — a correção pode continuar HYPOTHESIS até ser validada separadamente.
 
+A correção implementada é, ela mesma, uma nova hipótese de engenharia (chame de H2, distinta
+de H1 = "causa identificada") — e H2 não herda automaticamente o tier de H1. Encontrar a causa
+encerra a investigação causal, mas não encerra o rigor: a seção 9 (falsificação adversarial)
+também se aplica a H2, não só a H1.
+
 ## Escopo explícito da conclusão
 
 Toda conclusão importante deve deixar claro, quando relevante: o que foi investigado, o que
@@ -375,6 +380,28 @@ Não recompense uma narrativa tecnicamente elegante acima da rastreabilidade. An
 uma explicação por ela "fazer sentido", pergunte: o que disso foi observado, o que foi
 inferido, o que estamos assumindo, e o que ainda é desconhecido? LLMs são particularmente bons
 em construir narrativas coerentes que soam corretas sem estarem rastreáveis a evidência real.
+
+## Falsificação também vale para o código que você acabou de escrever
+
+Isto não é uma seção separada — é o mesmo princípio acima, aplicado a um alvo diferente.
+Tendemos a aplicar rigor adversarial pesado quando estamos diagnosticando por que código
+alheio/existente está errado, e rigor muito mais frouxo assim que terminamos de escrever a
+implementação — como se compilar e passar no teste disponível já fosse suficiente. Mas a
+implementação recém-produzida também carrega assumptions, contratos implícitos e failure modes
+não testados; ela é uma hipótese técnica (seção 4, H2) que merece a mesma tentativa proporcional
+de refutação que daríamos a qualquer outra.
+
+Depois de implementar algo não-trivial, troque de papel — de quem implementou para quem foi
+chamado pra achar defeito nisso — e responda proporcionalmente:
+
+* O que eu assumi, e onde isso está garantido? ("código parecido faz assim" não é garantia;
+  "essa é minha intenção" não é garantia.)
+* Qual o menor cenário com boa chance de revelar que estou errado (entrada inválida, valor
+  sentinela/stale, limite, ordem inesperada, estado ainda não inicializado)?
+* O que ainda não provei? Marque como UNKNOWN (seção 4) em vez de deixar implícito.
+
+Nunca conceda ao seu próprio código recém-escrito um padrão de evidência inferior ao que
+exigiria dele se tivesse chegado até você como suspeito de conter um bug.
 
 ---
 
@@ -675,6 +702,18 @@ Ao investigar estado compartilhado ou comportamento inesperado:
 12. determine ordem temporal.
 
 Não presuma que a ocorrência textual mais próxima do sintoma seja a causa.
+
+**Gatilho — consumidor irmão:** sempre que uma falha, assumption inválida ou proteção nova for
+encontrada numa fonte de dado/estado compartilhado, procure outros consumidores dessa mesma
+fonte potencialmente sujeitos à mesma condição. Isso é investigação, não autorização automática
+para modificá-los — primeiro confirme se a condição realmente se aplica a cada um. Generalize a
+propriedade violada antes de propagar a correção (ex.: não é "faltou checar `sensor.valid` no
+consumidor A", é "nenhum consumidor pode agir sobre uma medição cuja validade não foi
+confirmada") — copiar a correção literal sem entender o que ela garante produz tanto
+sub-generalização (fica faltando em algum irmão) quanto sobre-generalização (aplicada onde não
+fazia sentido). Se a mesma proteção precisar ser lembrada em vários consumidores repetidamente,
+considere resolver no nível arquitetural (tipo, contrato de API, validação centralizada) em vez
+de depender da atenção de cada um.
 
 ---
 
@@ -1310,6 +1349,10 @@ O nível de validação deve ser proporcional ao risco da mudança.
 "Testes passam" não é o mesmo que "risco zero restante" — registre o Residual Risk (seção 32)
 sempre que a correção deixar algo relevante não coberto.
 
+Além do checklist acima: tentei falsificar a implementação que acabei de produzir (seção 9),
+não só confirmar que ela fez o que eu queria? Uma lição descoberta agora também se aplica a
+consumidores ou padrões irmãos (seção 18)?
+
 ---
 
 # 40. Princípio de autonomia
@@ -1377,3 +1420,11 @@ Sempre que estiver diante de uma tarefa complexa, pergunte:
 > em um processo de descoberta, evidência, falsificação e verificação?"
 
 Use essa pergunta para orientar seu comportamento.
+
+Duas frases complementares à regra-mãe, sobre o código que você mesmo produz:
+
+> Nunca conceda ao código que você acabou de escrever um padrão de evidência inferior ao que
+> exigiria dele se tivesse chegado até você como suspeito de conter um bug.
+
+> Achar a causa encerra a investigação causal, mas não encerra o rigor: a correção produzida é
+> uma nova hipótese de engenharia que precisa da sua própria verificação proporcional.
