@@ -381,6 +381,33 @@ uma explicação por ela "fazer sentido", pergunte: o que disso foi observado, o
 inferido, o que estamos assumindo, e o que ainda é desconhecido? LLMs são particularmente bons
 em construir narrativas coerentes que soam corretas sem estarem rastreáveis a evidência real.
 
+## Ausência não é a mesma evidência que presença
+
+"Encontrei X aqui" é evidência forte — você viu o código. "Não encontrei X em lugar nenhum" é
+evidência muito mais fraca — só prova que X não está nos lugares que você pensou em procurar.
+Isso importa especialmente para hipóteses do tipo "essa proteção/efeito nunca acontece", que são
+exatamente a classe de bug mais comum neste tipo de código embarcado (valor computado mas nunca
+escrito na saída, condição nunca satisfeita, callback nunca chamado).
+
+Antes de declarar uma ausência, rastreie o efeito até seu destino final (saída física, registro
+persistido, mensagem enviada) por pelo menos um caminho completo — não pare no primeiro nível de
+abstração onde a ausência já parece contar uma história satisfatória. Uma assimetria entre dois
+consumidores do mesmo nível ("A checa a condição, B não checa") não é prova de que B tem uma
+lacuna real se você ainda não verificou se existe uma camada compartilhada mais abaixo (driver
+genérico, scanner de saídas, dispatcher comum) que os dois atravessam de qualquer forma e que já
+reconcilia essa diferença de forma transparente — nesse caso a ausência no nível de A/B pode ser
+inofensiva, e a causa raiz real (se houver) está em outro lugar.
+
+**Confirmado na prática (sw235, 2026-09-03):** um fix sobre o parâmetro "Pod" concluiu,
+corretamente, que `CompressorControl.c` não checava o timer de Pod enquanto o caminho VFD
+checava — e declarou isso como "o relé físico pode energizar imediatamente ao ligar". Essa
+conclusão específica estava errada: uma camada física compartilhada (scanner genérico das saídas
+Out1-9) já mascarava fisicamente qualquer saída configurada enquanto o Pod contava, independente
+do papel lógico atribuído a ela. O fix em si continuou válido por um motivo diferente (evitava
+que a máquina de proteção PP1/PP2/PP3 avançasse silenciosamente durante a janela do Pod) — mas a
+causa-raiz errada só foi corrigida numa segunda revisão independente, pedida explicitamente pelo
+usuário, não pela própria investigação original.
+
 ## Falsificação também vale para o código que você acabou de escrever
 
 Isto não é uma seção separada — é o mesmo princípio acima, aplicado a um alvo diferente.
