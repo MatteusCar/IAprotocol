@@ -418,8 +418,9 @@ implementação recém-produzida também carrega assumptions, contratos implíci
 não testados; ela é uma hipótese técnica (seção 4, H2) que merece a mesma tentativa proporcional
 de refutação que daríamos a qualquer outra.
 
-Depois de implementar algo não-trivial, troque de papel — de quem implementou para quem foi
-chamado pra achar defeito nisso — e responda proporcionalmente:
+Depois de **qualquer** edição em código — implementação nova, fix, refatoração, ou até um ajuste
+pequeno como um comentário — troque de papel — de quem implementou para quem foi chamado pra
+achar defeito nisso — e responda proporcionalmente:
 
 * O que eu assumi, e onde isso está garantido? ("código parecido faz assim" não é garantia;
   "essa é minha intenção" não é garantia.)
@@ -427,8 +428,39 @@ chamado pra achar defeito nisso — e responda proporcionalmente:
   sentinela/stale, limite, ordem inesperada, estado ainda não inicializado)?
 * O que ainda não provei? Marque como UNKNOWN (seção 4) em vez de deixar implícito.
 
+Não existe edição pequena demais para pular esta etapa. Se a mudança for genuinamente só texto
+(comentário/documentação, sem nenhuma alteração de comportamento), diga isso explicitamente antes
+de seguir ("isso é só comentário, sem revisão de lógica necessária") em vez de decidir isso em
+silêncio e simplesmente não revisar — a decisão de pular precisa ficar visível para o usuário
+poder discordar, não ser tomada e nunca mencionada.
+
+Essa revisão não é uma passada obrigatória e pronto — é um laço: se ela encontrar um problema,
+corrija e repita a revisão sobre a versão corrigida. Só pare quando uma passada não encontrar
+nada de novo (na prática, convencione parar depois de ~3 passadas seguidas sem achado, salvo
+indicação em contrário).
+
+**Confirmado na prática (sw235, 2026-09-06):** o fix do parâmetro "rdc" (compressor VFD/porta
+aberta) passou por uma primeira autorrevisão antes de commitar, que não achou nada. Só numa
+segunda rodada — pedida explicitamente pelo usuário, não decidida por iniciativa própria — foi
+achado que o bloqueio recém-implementado vazava para o estado de standby/Pod, produzindo uma
+saída indevida. Se a segunda rodada não tivesse acontecido, esse bug teria sido commitado.
+
 Nunca conceda ao seu próprio código recém-escrito um padrão de evidência inferior ao que
 exigiria dele se tivesse chegado até você como suspeito de conter um bug.
+
+## O nome de uma função não é evidência do que ela faz
+
+Antes de confiar em `if (funcao())` em qualquer lugar novo — seu ou alheio — rastreie o valor de
+retorno real dela pelo menos uma vez, lendo o corpo da função. Não assuma que o nome e a
+implementação concordam; nomes são a intenção de quem escreveu, não uma garantia verificada.
+
+**Confirmado na prática (sw235, 2026-09-05/06):** `isVFOutLock()` ("está travado?") retornava 0
+quando uma condição de bloqueio estava presente e 1 quando estava tudo normal — exatamente o
+oposto do que o nome sugere, e do que todos os 3 lugares que a chamavam assumiam (`if
+(isVFOutLock()) { <aplica bloqueio> }`). O efeito prático: a saída ficava presa no mínimo durante
+operação normal, e sem limite algum durante um bloqueio de verdade. O erro sobreviveu por ~1 mês
+de desenvolvimento ativo porque ninguém — nem quem escreveu, nem quem revisou depois — parou para
+rastrear os `return` um por um contra o nome da função.
 
 ---
 
