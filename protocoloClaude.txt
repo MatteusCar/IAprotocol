@@ -418,52 +418,76 @@ implementação recém-produzida também carrega assumptions, contratos implíci
 não testados; ela é uma hipótese técnica (seção 4, H2) que merece a mesma tentativa proporcional
 de refutação que daríamos a qualquer outra.
 
-Depois de **qualquer** edição em código — implementação nova, fix, refatoração, ou até um ajuste
-pequeno como um comentário — troque de papel — de quem implementou para quem foi chamado pra
-achar defeito nisso — e responda proporcionalmente:
+Depois de escrever ou alterar código, troque de papel — de quem implementou para quem foi
+chamado pra achar defeito nisso — e responda proporcionalmente:
 
 * O que eu assumi, e onde isso está garantido? ("código parecido faz assim" não é garantia;
   "essa é minha intenção" não é garantia.)
 * Qual o menor cenário com boa chance de revelar que estou errado (entrada inválida, valor
-  sentinela/stale, limite, ordem inesperada, estado ainda não inicializado)?
+  sentinela/stale, limite, ordem inesperada, estado ainda não inicializado)? Se esse cenário for
+  plausível e de custo razoável, prefira transformá-lo num teste executável em vez de só
+  argumentar sobre ele — e considere preservá-lo como teste de regressão (seção 31).
 * O que ainda não provei? Marque como UNKNOWN (seção 4) em vez de deixar implícito.
-* Percorri (com busca de verdade no código, não de memória) **todos** os pontos onde a
+* Percorri (com busca de verdade no código, não de memória) todos os pontos onde a
   variável/função que toquei é lida ou escrita — não só os que eu tinha em mente ao escrever o
   fix?
-* Tracei manualmente, com valores concretos (não só em abstrato), cada combinação de estado
-  relevante — não só o caminho feliz?
-* Para qualquer estado compartilhado que a correção lê ou escreve: conferi a ordem real de
-  execução (o que roda antes/depois, no mesmo ciclo/tick/chamada) contra o que eu presumi?
+* Tracei com valores concretos as classes de estado relevantes — caminho nominal, boundaries,
+  entradas inválidas, transições, e combinações com interação plausível — em vez de tentar
+  enumerar cada combinação possível ou raciocinar só em abstrato?
+* Para qualquer estado compartilhado que a correção lê ou escreve: a ordem que presumi é
+  realmente garantida pelo sistema, ou só observei que "costuma" ser assim? Quando houver
+  concorrência de verdade (ISR, DMA, outra task/thread), identifique os interleavings plausíveis
+  e o que de fato garante a ordem (sincronização, atomicidade, ownership) — não gaste esse
+  esforço quando a execução já é sequencial e determinística por construção (ex.: um único
+  despachante de tick, sem preempção).
 * Essa correção poderia disparar ou vazar efeito num estado onde não deveria (desligado,
   inicialização/boot, um modo ou fase diferente do que eu tinha em mente ao escrever)?
 * Se ajustei algo durante esta própria revisão, recompilei de novo depois do ajuste — não só
   no final, antes de começar a revisar?
 
-Não existe edição pequena demais para pular esta etapa. Se a mudança for genuinamente só texto
-(comentário/documentação, sem nenhuma alteração de comportamento), diga isso explicitamente antes
-de seguir ("isso é só comentário, sem revisão de lógica necessária") em vez de decidir isso em
-silêncio e simplesmente não revisar — a decisão de pular precisa ficar visível para o usuário
-poder discordar, não ser tomada e nunca mencionada.
+Não limite essa revisão ao diff textual. Toda mudança tem uma **change surface** (o que foi
+literalmente editado) e uma **behavioral surface**, geralmente maior — todo estado, consumidor,
+saída, modo ou contrato cujo comportamento pode ser afetado, mesmo sem ter sido tocado. Estime a
+behavioral surface proporcionalmente ao risco antes de considerar a revisão completa. Isso é
+diferente de perguntar "quem mais compartilha essa mesma falha/assumption" (seção 18, consumidor
+irmão) — são duas perguntas diferentes: behavioral surface é "o que minha mudança pode afetar";
+consumidor irmão é "quem mais tem a mesma vulnerabilidade".
 
-Essa revisão não é uma passada obrigatória e pronto — é um laço: se ela encontrar um problema,
-corrija e repita a revisão sobre a versão corrigida. Só pare quando uma passada não encontrar
-nada de novo (na prática, convencione parar depois de ~3 passadas seguidas sem achado, salvo
-indicação em contrário).
+Nem toda alteração exige essa revisão completa — proporcionalidade (seção 1) continua valendo
+aqui. Alterações que não podem mudar comportamento, estado, contrato, interface, timing ou
+interpretação executável do sistema (ex.: um comentário, um typo de documentação) não exigem
+revisão lógica — mas classifique isso explicitamente antes de seguir ("isso é só comentário, sem
+efeito em comportamento") em vez de decidir em silêncio; a classificação errada de algo como "só
+cosmético" é, ela mesma, o tipo de erro que essa seção existe para pegar.
+
+Se a revisão encontrar um problema real, corrija e revise de novo a versão corrigida — mas não
+trate repetir a mesma autorrevisão indefinidamente como o caminho principal para ganhar
+confiança. O mesmo agente que implementou pode carregar o mesmo framing, as mesmas assumptions e
+o mesmo blind spot na hora de revisar — duas autorrevisões não são duas fontes independentes de
+evidência (mesmo princípio já usado para múltiplos agentes, seção 11). Ausência de achado numa
+autorrevisão é evidência fraca de correção, não prova. Quando a mudança for de risco ou
+ambiguidade maior, prefira diversidade de evidência — teste discriminante, execução real,
+instrumentação, revisor independente — a empilhar mais uma passada do mesmo tipo.
 
 **Confirmado na prática (sw235, 2026-09-06):** o fix do parâmetro "rdc" (compressor VFD/porta
 aberta) passou por uma primeira autorrevisão antes de commitar, que não achou nada. Só numa
 segunda rodada — pedida explicitamente pelo usuário, não decidida por iniciativa própria — foi
-achado que o bloqueio recém-implementado vazava para o estado de standby/Pod, produzindo uma
-saída indevida. Se a segunda rodada não tivesse acontecido, esse bug teria sido commitado.
+achado que o bloqueio recém-implementado vazava para o estado de standby/Pod. A lição não é "duas
+autorrevisões bastam" — é que a primeira passada compartilhou o mesmo enquadramento da
+implementação original e não teria sido suficiente sozinha; só uma segunda perspectiva (mesmo
+sendo o mesmo agente, mas deliberadamente instruído a olhar de novo) revelou o problema.
 
 Nunca conceda ao seu próprio código recém-escrito um padrão de evidência inferior ao que
-exigiria dele se tivesse chegado até você como suspeito de conter um bug.
+exigiria dele se tivesse chegado até você como suspeito de conter um bug. E quando precisar de
+mais confiança, prefira diversidade de evidência a repetição mecânica da mesma análise.
 
 ## O nome de uma função não é evidência do que ela faz
 
-Antes de confiar em `if (funcao())` em qualquer lugar novo — seu ou alheio — rastreie o valor de
-retorno real dela pelo menos uma vez, lendo o corpo da função. Não assuma que o nome e a
-implementação concordam; nomes são a intenção de quem escreveu, não uma garantia verificada.
+Um nome de função é uma pista semântica, não uma prova. Quando uma conclusão, correção ou
+implementação depender da semântica de retorno ou dos efeitos de uma função, não infira essa
+semântica só pelo nome. Verifique o contrato disponível e, quando ele não for inequívoco ou a
+função for crítica para a conclusão, rastreie sua implementação, seus `return`s e os callers
+relevantes pelo menos uma vez.
 
 **Confirmado na prática (sw235, 2026-09-05/06):** `isVFOutLock()` ("está travado?") retornava 0
 quando uma condição de bloqueio estava presente e 1 quando estava tudo normal — exatamente o
@@ -471,7 +495,11 @@ oposto do que o nome sugere, e do que todos os 3 lugares que a chamavam assumiam
 (isVFOutLock()) { <aplica bloqueio> }`). O efeito prático: a saída ficava presa no mínimo durante
 operação normal, e sem limite algum durante um bloqueio de verdade. O erro sobreviveu por ~1 mês
 de desenvolvimento ativo porque ninguém — nem quem escreveu, nem quem revisou depois — parou para
-rastrear os `return` um por um contra o nome da função.
+rastrear os `return` um por um contra o nome da função. Quando esse tipo de discrepância entre
+nome, implementação e suposição dos chamadores for encontrado, pergunte também se a classe do
+erro pode ser tornada mais difícil de repetir por um mecanismo determinístico (rename, contrato
+explícito, assertion, teste, tipo mais expressivo) em vez de depender só de alguém lembrar de
+reler a função da próxima vez (mesmo critério de escolha de destino da seção 33).
 
 ---
 
