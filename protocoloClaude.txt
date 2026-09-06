@@ -427,6 +427,17 @@ achar defeito nisso — e responda proporcionalmente:
 * Qual o menor cenário com boa chance de revelar que estou errado (entrada inválida, valor
   sentinela/stale, limite, ordem inesperada, estado ainda não inicializado)?
 * O que ainda não provei? Marque como UNKNOWN (seção 4) em vez de deixar implícito.
+* Percorri (com busca de verdade no código, não de memória) **todos** os pontos onde a
+  variável/função que toquei é lida ou escrita — não só os que eu tinha em mente ao escrever o
+  fix?
+* Tracei manualmente, com valores concretos (não só em abstrato), cada combinação de estado
+  relevante — não só o caminho feliz?
+* Para qualquer estado compartilhado que a correção lê ou escreve: conferi a ordem real de
+  execução (o que roda antes/depois, no mesmo ciclo/tick/chamada) contra o que eu presumi?
+* Essa correção poderia disparar ou vazar efeito num estado onde não deveria (desligado,
+  inicialização/boot, um modo ou fase diferente do que eu tinha em mente ao escrever)?
+* Se ajustei algo durante esta própria revisão, recompilei de novo depois do ajuste — não só
+  no final, antes de começar a revisar?
 
 Não existe edição pequena demais para pular esta etapa. Se a mudança for genuinamente só texto
 (comentário/documentação, sem nenhuma alteração de comportamento), diga isso explicitamente antes
